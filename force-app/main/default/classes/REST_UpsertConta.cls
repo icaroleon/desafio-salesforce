@@ -8,7 +8,7 @@ global class REST_UpsertConta {
         List<Account> accountsToUpsert = (List<Account>) JSON.deserialize(reqBody, List<Account>.class);
         
         try{
-            insert accountsToUpsert;
+            upsert accountsToUpsert;
         } catch (Exception e){
             RestContext.response.responseBody = Blob.valueOf('Error: ' + e.getMessage());
         }
