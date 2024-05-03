@@ -19,7 +19,10 @@ global class REST_UpsertConta {
                     'recordsUpserted' => accountsToUpsert
                     };
                         
-                        response.statusCode = 200;
+                        String jsonResponse = JSON.serialize(responseMap);
+            response.responseBody = Blob.valueOf(jsonResponse);
+            
+            response.statusCode = 200;
         } catch (Exception e){
             RestContext.response.responseBody = Blob.valueOf('Error: ' + e.getMessage());
             response.statusCode = 500;
