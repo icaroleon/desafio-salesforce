@@ -2,12 +2,11 @@
 
 ## Visão Geral do Projeto
 
-Este projeto foi desenvolvido como parte do Desafio Globo Salesforce, com o objetivo de implementar uma série de funcionalidades na plataforma Salesforce que permitem uma gestão mais eficaz e automatizada dos objetos `Account` e `Order`, assim como a criação e gestão de um objeto customizado chamado `País`. Este documento visa detalhar as soluções implementadas, explicar as decisões de design tomadas durante o desenvolvimento e discutir os componentes utilizados.
+Este projeto foi desenvolvido como parte do Desafio Globo Salesforce, com o objetivo de implementar uma série de funcionalidades na plataforma Salesforce que permitem uma gestão mais eficaz e automatizada dos objetos `Account` e `Order`, assim como a criação e gestão de um objeto customizado chamado `País`. Este documento visa detalhar as soluções implementadas, explicar as decisões de design tomadas durante o desenvolvimento e discutir os componentes utilizados. Para tanto, os tópicos serão divididos conforme os requisitos apresentados no Desafio.
 
-## Funcionalidades Implementadas
 ## 1. Customização de objetos
 
-### - Objeto `País` (Pais__c)
+### Objeto `País` (Pais__c)
 Foi criado um objeto customizado `País`, equipado com campos para `Sigla`, `Moeda` e `Idioma`. O campo `Sigla` foi configurado como obrigatório e único para evitar duplicidades e garantir a integridade dos dados.
 
 | Campo  | API Name  | Tipo de Campo  | Objetivo |
@@ -15,7 +14,7 @@ Foi criado um objeto customizado `País`, equipado com campos para `Sigla`, `Moe
 | Idioma | Idioma__c | Texto          | Campo para armazenar informações sobre o `Idioma` do País. |
 | Moeda  | Moeda__c  | Texto          | Campo para armazenar informações sobre a `Moeda` do País.  |
 | Sigla  | Sigla__c  | Texto          | Campo para armazenar informações sobre a `Sigla` do País.  |
-
+<br>
 
 ### - Campos Customizados no Objeto `Account` (Account)
 Foram adicionados ao objeto `Account` três campos customizados:
@@ -28,15 +27,11 @@ Foram adicionados ao objeto `Account` três campos customizados:
 | Email                             | Email__c                          | Texto (Email)         | Campo utilizado para armazenar um endereço de email que será enviado a informação sobre a criação da conta (Explicação detalhada mais a frente).                 |
 | Wish To Send Email Confirmation?  | Wish_To_Send_Email_Confirmation__c| Checkbox              | Indica se o cliente deseja receber emails de confirmação ou não. (Explicação detalhada mais a frente)                                                            |
 
-</br>
-</br>
 
-### Detalhamento do Campo de Fórmula (Requisito do Desafio)
 
-**Objetivo:** *Para realizar tal inserção, o tipo de campo selecionado foi **fórmula**, de modo a capturar as informações do relacionamento com o Objeto País e inserir tais informações.*
+## 2. Campo de resumo das informações do País em Conta
 
-**Validação Final:**
-A expressão de fórmula usada para construir o campo foi configurada da seguinte forma:
+**Objetivo:** O tipo de campo selecionado foi **fórmula**, de modo a capturar as informações do relacionamento com o Objeto País e inserir tais informações, sendo que a expressão usada para construir o campo foi configurada da seguinte forma:
 
 ```
 "- N: " & IF(Pais__r.Name = null, "__N/A__", Pais__r.Name) &BR()&
@@ -45,15 +40,9 @@ A expressão de fórmula usada para construir o campo foi configurada da seguint
 "- M: " & IF(Pais__r.Moeda__c = null, "__N/A__", Pais__r.Moeda__c)
 ```
 
-</br>
-</br>
-</br>
 
-### 2. Endpoints Customizados e seus respectivos testes
-Implementamos dois endpoints customizados:
-- Um endpoint de "Upsert" para o objeto `Account`, permitindo atualizações ou inserções baseadas na existência do registro.
-
-Endpoint:
+## 3. Endpoints Customizados e seus respectivos testes
+### Endpoint de "Upsert" para o objeto `Account`:
 
 ```
 @RestResource(urlMapping='/AccountUpsert/*')
@@ -88,9 +77,7 @@ global class REST_UpsertConta {
     }
 }
 ```
-
-Teste:
-
+### Teste do Endpoint de "Upsert" para Account:
 ```
 @isTest
 public class TestUpsertAccount {
@@ -122,17 +109,250 @@ public class TestUpsertAccount {
 }
 ```
 
+### Endpoint de "Insert" para `Order`:
 
+```
+@RestResource(urlMapping='/InsertOrder/*')
+global class REST_InsertOrder {
 
+    @HttpPost
+    global static void insertOrder(){
+        RestRequest req = RestContext.request;
+        RestResponse response = RestContext.response;
 
-- Um endpoint de "Insert" para o objeto `Order`, facilitando a inserção de novas ordens com detalhamento claro dos contratos de entrada e saída.
+        String reqBody = req.requestBody.toString();
+        List<Order> ordersToInsert = (List<Order>) JSON.deserialize(reqBody, List<Order>.class);
 
-### 4. Automação com e sem Código
-- Foi desenvolvida uma automação com código para enviar um email sempre que uma conta for criada ou editada, com a possibilidade de habilitar ou desabilitar essa funcionalidade via interface gráfica.
+        try{
+            insert ordersToInsert;
+
+            response.statusCode = 200;
+        } catch (Exception e){
+            RestContext.response.responseBody = Blob.valueOf('Error: ' + e.getMessage());
+        }
+    }
+}
+```
+### Teste do Endpoint de "Insert" para `Order`:
+
+```
+@isTest
+public class TestInsertOrder {
+    @isTest
+    public static void makePostCallout(){
+
+        String JSONMsg = '[{"AccountId": "001ak00000Fnb5rAAB","EffectiveDate": "2024-05-02","ContractId": "800ak000008fd33AAA","Status": "Draft"}]';
+
+        RestRequest req = new RestRequest();
+        RestResponse res = new RestResponse();
+
+        req.requestURI = '/services/apexrest/InsertOrder';
+        req.httpMethod = 'POST';
+        req.requestBody = Blob.valueof(JsonMsg);
+        res.responseBody = Blob.valueOf('Order Inserted');
+
+        RestContext.request = req;
+        RestContext.response = res;
+
+        Test.startTest();
+        REST_InsertOrder.insertOrder();
+        Test.stopTest();
+
+        System.assertEquals(200, res.statusCode);
+        System.assertNotEquals(res.responseBody.toString(), 'A resposta não deve ser nula.');
+        System.assertEquals(res.responseBody.toString(), 'Order Inserted');
+    }
+}
+```
+
+## 4. Automação com Código para enviar email sempre que uma cria conta
+Foi desenvolvida uma automação com código para enviar um email sempre que uma conta for criada ou editada, com a possibilidade de habilitar ou desabilitar essa funcionalidade via interface gráfica.
+
+### Trigger:
+```
+trigger sendEmailWhenAccountIsCreated on Account (before insert, before update) {
+    List<Account> accountsCreated = new List<Account>();
+
+    for(Account acc : Trigger.new){
+       accountsCreated.add(acc);
+    }
+
+    SendAccountEmail.sendEmail(accountsCreated);
+}
+```
+### Classe Apex responsável pelo envio do email:
+
+```
+public class SendAccountEmail {
+
+    public static void sendEmail(List<Account> accountsCreated){
+
+        EmailTemplate emailTemplate = [Select ID from EmailTemplate WHERE DeveloperName = 'SalesNewCustomerEmail'];
+
+        List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+
+        for(Account acc : accountsCreated){
+
+            if(acc.Wish_To_Send_Email_Confirmation__c == 'Yes' && acc.Email__c != null){
+
+                Messaging.SingleEmailMessage singleMail = new Messaging.SingleEmailMessage();
+                String [] toAddress = new String[]{acc.Email__c};
+
+                singleMail.setToAddresses(toAddress);
+                singleMail.setSubject('Welcome to Our Service!');
+                singleMail.setPlainTextBody('Dear Customer, thank you for signing up!');
+                singleMail.setSaveAsActivity(false);
+
+                emails.add(singleMail);
+            }
+        }
+
+        if (!emails.isEmpty()) {
+            Messaging.sendEmail(emails);
+        }
+    }
+}
+```
+### Componente LWC (HTML):
+
+```
+<template>
+  <lightning-card>
+    <div class="inputs">
+      <lightning-record-edit-form
+      record-id={recordId}
+      object-api-name="Account"
+      >
+      <lightning-messages> </lightning-messages>
+      <lightning-output-field field-name="AccountId">
+      </lightning-output-field>
+      <lightning-input-field field-name="Email__c"> </lightning-input-field>
+      <lightning-input-field field-name="Wish_To_Send_Email_Confirmation__c"></lightning-input-field>
+      <lightning-input-field field-name="Email"> </lightning-input-field>
+      <lightning-button
+      class="slds-m-top_small"
+      variant="brand"
+      type="submit"
+      name="update"
+      label="Salvar"
+      >
+      </lightning-button>
+      </lightning-record-edit-form>
+    </div>
+  </lightning-card>
+</template>
+```
+### Componente LWC (Javascript):
+
+```
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { LightningElement, api } from 'lwc';
+
+export default class AccountEmailEditor extends LightningElement {
+
+  @api recordId;
+
+    handleSuccess(event) {
+        this.dispatchEvent(new ShowToastEvent({
+            title: 'Success',
+            message: 'E-mail has been updated!',
+            variant: 'success'
+        }));
+    }
+}
+```
+## 4. Automação sem código
 - Uma automação sem uso de código foi implementada para atualizar o valor total de vendas de uma conta sempre que uma nova `Order` for associada a essa conta.
+
 
 ### 5. Processo Automático de Limpeza de Dados
 Criamos um processo que executa automaticamente uma vez por dia para deletar ordens com data de modificação maior que 3 meses, considerando o alto volume de dados envolvido.
+
+### Classe Apex de Agendamento
+
+ ```
+ global class ScheduleMassDelete implements Schedulable {
+
+    global void execute(SchedulableContext sc){
+
+        Database.executeBatch(new MassDeleteOrders(), 200);
+    }
+}
+```
+### Classe Apex responsável por buscar as Ordens à serem deletadas e lidar com o alto volume de dados:
+
+```
+global class MassDeleteOrders implements Database.Batchable<sObject>, Database.Stateful {
+
+    public Database.QueryLocator start(Database.BatchableContext bc) {
+        Date threeMonthsAgo = Date.Today().addMonths(-3);
+        String query = 'SELECT Id FROM Order WHERE LastModifiedDate < :threeMonthsAgo';
+
+        return Database.getQueryLocator(query);
+    }
+
+    public void execute(Database.BatchableContext bc, List<Order> records){
+
+        delete records;
+    }
+
+    public void finish(Database.BatchableContext bc){
+        AsyncApexJob job = [SELECT Id, Status, NumberOfErrors,
+                            JobItemsProcessed,
+                            TotalJobItems, CreatedBy.Email
+                            FROM AsyncApexJob
+                            WHERE Id = :bc.getJobId()];
+
+        Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+        String[] toAddresses = new String[]{'icvieiramg@gmail.com'};
+
+
+            try {
+                mail.setToAddresses(toAddresses);
+                mail.setSubject('Apex Sharing Recalculation ' + job.Status);
+                mail.setPlainTextBody
+                    ('The batch Apex job processed ' + job.TotalJobItems +
+                     ' batches with '+ job.NumberOfErrors + ' failures.');
+                Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
+            } catch(Exception e){
+                System.debug('Error sending email: ' + e.getMessage());
+            }
+    }
+}
+```
+
+### Teste da Classe Apex responsável pela deleção:
+
+```
+@isTest
+public class MassDeleteTest {
+
+    @testSetup
+    static void setup() {
+        List<Order> orders = new List<Order>();
+
+        for (Integer i=0;i<10;i++) {
+            String orderJson = '{"AccountId": "001ak00000Fnb5rAAB", "EffectiveDate": "2024-05-02", "ContractId": "800ak000008fd33AAA", "Status": "Draft", "LastModifiedDate" : "2024-02-01"}';
+            Order order = (Order) JSON.deserialize(orderJson, Order.class);
+            orders.add(order);
+        }
+
+        insert orders;
+    }
+
+    @isTest static void test() {
+        Test.startTest();
+        MassDeleteOrders massDeleteOrders = new MassDeleteOrders();
+        Id batchId = Database.executeBatch(massDeleteOrders);
+        Test.stopTest();
+
+        Date threeMonthsFromToday = Date.Today().addMonths(-3);
+
+        System.assertEquals(0, [SELECT count() FROM Order WHERE LastModifiedDate < :threeMonthsFromToday ]);
+    }
+}
+```
+
 
 ## Considerações de Design e Implementação
 
