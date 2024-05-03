@@ -1,8 +1,10 @@
-# Documentação do Projeto Desafio Globo Salesforce
+# Documentação do Projeto Desafio Salesforce
 
 ## Visão Geral do Projeto
 
-Este projeto foi desenvolvido como parte do Desafio Globo Salesforce, com o objetivo de implementar uma série de funcionalidades na plataforma Salesforce que permitem uma gestão mais eficaz e automatizada dos objetos `Account` e `Order`, assim como a criação e gestão de um objeto customizado chamado `País`. Este documento visa detalhar as soluções implementadas, explicar as decisões de design tomadas durante o desenvolvimento e discutir os componentes utilizados. Para tanto, os tópicos serão divididos conforme os requisitos apresentados no Desafio.
+Este projeto foi desenvolvido como parte do Desafio Salesforce, com o objetivo de implementar uma série de funcionalidades na plataforma Salesforce que permitem uma gestão mais eficaz e automatizada dos objetos `Account` e `Order`, assim como a criação e gestão de um objeto customizado chamado `País`. Este documento visa detalhar as soluções implementadas, explicar as decisões de design tomadas durante o desenvolvimento e discutir os componentes utilizados. 
+
+Para tanto, os tópicos serão divididos conforme os requisitos apresentados no Desafio.
 
 ## 1. Customização de objetos
 
@@ -19,7 +21,7 @@ Foi criado um objeto customizado `País`, equipado com campos para `Sigla`, `Moe
 ### - Campos Customizados no Objeto `Account` (Account)
 Foram adicionados ao objeto `Account` três campos customizados:
 
-| Campo                             | API Name                          | Tipo de Campo         | Objetivo                                                                                                                                                          |
+| Campo                             | API Name                          | Tipo de Campo         | Objetivo                    |
 |-----------------------------------|-----------------------------------|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Valor Total de Vendas             | Valor_Total_de_Vendas__c          | Número (Currency)     | Campo para armazenar o valor total de vendas da conta.                                                                                                            |
 | País                              | Pais__c                           | Lookup (País)         | Campo de relacionamento Lookup obrigatório com o objeto `País`, permitindo uma associação direta entre uma conta e um país.                                       |
@@ -31,7 +33,7 @@ Foram adicionados ao objeto `Account` três campos customizados:
 
 ## 2. Campo de resumo das informações do País em Conta
 
-**Objetivo:** O tipo de campo selecionado foi **fórmula**, de modo a capturar as informações do relacionamento com o Objeto País e inserir tais informações, sendo que a expressão usada para construir o campo foi configurada da seguinte forma:
+Um dos requisitos apresentados era criar um campo que exibisse um resumo das informações principais de um país, formatado de maneira específica. Esse campo deveria incluir o nome do país, a sigla, o idioma oficial e a moeda em uso, apresentados de forma clara e concisa para fácil consulta e integração. Para tanto, foi implementado um campo **fórmula**, sendo que a expressão restou configurada da seguinte forma:
 
 ```
 "- N: " & IF(Pais__r.Name = null, "__N/A__", Pais__r.Name) &BR()&
