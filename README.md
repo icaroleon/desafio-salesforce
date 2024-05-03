@@ -55,12 +55,14 @@ global class REST_UpsertConta {
         RestRequest request = RestContext.request;
         RestResponse response = RestContext.response;
 
+	// Converte o corpo da requisição de JSON para uma lista de objetos Account
         String requestBody = request.requestBody.toString();
         List<Account> accountsToUpsert = (List<Account>) JSON.deserialize(requestBody, List<Account>.class);
 
         try{
             upsert accountsToUpsert;
 
+	    // Prepara a resposta de sucesso caso seja inserido com sucesso
             Map<String, Object> responseMap = new Map<String, Object>{
                 'status' => 'success',
                     'message' => 'Accounts have been upserted successfully.',
@@ -73,6 +75,7 @@ global class REST_UpsertConta {
 
             response.statusCode = 200;
         } catch (Exception e){
+	    // Em caso de exceção, prepara a resposta de erro
             RestContext.response.responseBody = Blob.valueOf('Error: ' + e.getMessage());
             response.statusCode = 500;
         }
@@ -122,11 +125,13 @@ global class REST_InsertOrder {
         RestRequest req = RestContext.request;
         RestResponse response = RestContext.response;
         
+        // Converte o corpo da requisição de JSON para uma lista de objetos Account
         String reqBody = req.requestBody.toString();
         List<Order> ordersToInsert = (List<Order>) JSON.deserialize(reqBody, List<Order>.class);
         
         try{
             insert ordersToInsert;
+             // Prepara a resposta de sucesso caso seja inserido com sucesso
             Map<String, Object> responseMap = new Map<String, Object>{
                 'status' => 'success',
                     'message' => 'Orders have been inserted successfully.',
@@ -137,7 +142,8 @@ global class REST_InsertOrder {
                         String jsonResponse = JSON.serialize(responseMap);
             response.responseBody = Blob.valueOf(jsonResponse);
             response.statusCode = 200;
-        } catch (Exception e){           
+        } catch (Exception e){     
+            // Em caso de exceção, prepara a resposta de erro
             Map<String, Object> errorResponse = new Map<String, Object>{
                 'status' => 'error',
                 'message' => 'Error: ' + e.getMessage()
@@ -201,31 +207,44 @@ trigger sendEmailWhenAccountIsCreated on Account (before insert, before update) 
 
 ```
 public class SendAccountEmail {
-    
-   public static void sendEmail(List<Account> accountsCreated){
-        
-		List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
-        
-        for(Account acc : accountsCreated){
-            if(acc.Wish_To_Send_Email_Confirmation__c == 'Yes' && acc.Email__c != null){
+
+    // Método estático para enviar e-mails de confirmação de conta
+    public static void sendEmail(List<Account> accountsCreated) {
+
+        // Lista para armazenar os e-mails a serem enviados
+        List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+
+        // Itera sobre as contas criadas
+        for (Account acc : accountsCreated) {
+            // Verifica se a opção de envio de e-mail de confirmação está habilitada e se o e-mail da conta não é nulo
+            if (acc.Wish_To_Send_Email_Confirmation__c == 'Yes' && acc.Email__c != null) {
                 
+                // Cria um objeto SingleEmailMessage para o e-mail
                 Messaging.SingleEmailMessage singleMail = new Messaging.SingleEmailMessage();
-                String [] toAddress = new String[]{acc.Email__c};
-                                        
+                
+                // Define o endereço de e-mail do destinatário
+                String[] toAddress = new String[]{acc.Email__c};
                 singleMail.setToAddresses(toAddress);
+                
+                // Define o assunto e o corpo do e-mail
                 singleMail.setSubject('Welcome to Our Service!');
                 singleMail.setPlainTextBody('Dear Customer, thank you for signing up!');
+                
+                // Define se o e-mail deve ser salvo como uma atividade na Salesforce
                 singleMail.setSaveAsActivity(false);
-           
+                
+                // Adiciona o e-mail à lista de e-mails
                 emails.add(singleMail);
-            }       
-        }   
+            }
+        }
         
+        // Se a lista de e-mails não estiver vazia, envia os e-mails
         if (!emails.isEmpty()) {
             Messaging.sendEmail(emails);
         }
     }
 }
+
 ```
 ### Componente LWC (HTML):
 
@@ -287,9 +306,6 @@ Para contornar essas dificuldades, implementou-se um Flow Trigger associado ao O
 <p align="center">
   <img src="https://github.com/icaroleon/desafio-salesforce/assets/100085859/017a3db7-10f9-4816-9fb7-92eaac274ab0" />
 </p>
-
-
-
 
 ### 5. Processo Automático de Limpeza de Dados
 A fim de criar uma automação que seja capaz de realizar a deleção de ordens com data de modificação maior que 3 meses e, de modo a considerar o alto volume de dados envolvido, foi criado um código que define uma classe global chamada ScheduleMassDelete que implementa a interface Schedulable do Salesforce. Isso permite que a classe seja agendada para executar em intervalos específicos conforme definido pelo agendamento do Apex. Tal classe chama outra classe Apex inicia um trabalho de processamento em lote. Isso é adequado para operações que precisam processar um grande número de registros, como deletar ordens em massa.
@@ -379,10 +395,10 @@ public class MassDeleteTest {
 ```
 
 
-## Considerações de Design e Implementação
+## Conclusão e Considerações de Design e Implementação
 
-Durante o desenvolvimento, diversas considerações de design foram feitas para maximizar a eficiência e a eficácia das soluções implementadas. Este documento também inclui uma discussão sobre alternativas de implementação, vantagens e desvantagens das abordagens escolhidas, impactos nos limites da plataforma Salesforce e outras notas relevantes.
+Durante o desenvolvimento, diversas considerações de design foram feitas para maximizar a eficiência e a eficácia das soluções implementadas. A princípio, apesar da Salesforce apresentar diversas possibilidades de customização, propõe-se seguir o seu LDS, de modo a aproveitar o máximo dos recursos nativos. Contudo, a depender das Regras de Negócio ou dos objetivos da implementação, não se vê obstáculos em modificar o caminho. Também, cabe destacar que o escopo do projeto representa apenas uma parcela das possibilidades disponíveis e que a solução deve ser adaptada de acordo com as necessidades individuais de cada cliente.
 
-## Conclusão
+Para garantir uma implementação sem contratempos,atenção especial à documentação e à consulta à comunidade Salesforce foi dedicada, realizando profunda pesquisa antes do início da implementação. Questões específicas, como as peculiaridades do objeto Order, foram abordadas com base em experiências anteriores compartilhadas por outros membros da comunidade.
 
-Este documento fornece uma visão completa das funcionalidades implementadas no Desafio Globo Salesforce, oferecendo insights sobre as técnicas e práticas adotadas. As soluções propostas visam melhorar a interação com a plataforma Salesforce, proporcionando maior automação e integração de processos críticos de negócios.
+Quanto a futuras melhorias, seria interessante a implementação de testes unitários abrangentes, incluindo cenários negativos, e uma cobertura mais completa, especialmente para o componente LWC. Embora não tenha sido abordado esses aspectos completamente devido a restrições de tempo, a importância de sua inclusão para garantir a qualidade e a robustez da solução é essencial.
