@@ -168,47 +168,44 @@ public class TestInsertOrder {
 ```
 
 ## 4. Automação com Código para enviar email sempre que uma cria conta
-Foi desenvolvida uma automação com código para enviar um email sempre que uma conta for criada ou editada, com a possibilidade de habilitar ou desabilitar essa funcionalidade via interface gráfica.
+Foi desenvolvida uma automação com código para enviar um email sempre que uma conta for criada ou editada, com a possibilidade de habilitar ou desabilitar essa funcionalidade via interface gráfica. 
+
+Para tanto, foi criado tanto um componente LWC afim de demonstrar os conhecimentos adquiridos quanto adicionado um campo de confirmação ao formulário de criação de registro. 
+
+Caso a opção "*Wish To Send Email Confirmation*" esteja desabilitada, o email de criação de conta não é enviado. Também, a lógica da confirmação do email foi separada da Trigger, de modo a seguir as boas práticas.
+
+PS: Cabe ressaltar que, apesar de ter sido uma ótima oportunidade de aplicar os conhecimentos LWC, após uma análise da possível implementação, é bem possível que, a depender das *regras de negócio* não seja necessário desenvolver um componente ou uma trigger que seja acionada no momento da edição do registro. Afinal, se o objetivo é somente enviar um e-mail ao criar contas, não há necessidade de acionar a trigger no evento de atualização. Limitando a trigger ao evento before insert, seria otimizado o desempenho e evita-se o envio desnecessário de e-mails durante atualizações. 
 
 ### Trigger:
 ```
 trigger sendEmailWhenAccountIsCreated on Account (before insert, before update) {
-    List<Account> accountsCreated = new List<Account>();
-
-    for(Account acc : Trigger.new){
-       accountsCreated.add(acc);
-    }
-
-    SendAccountEmail.sendEmail(accountsCreated);
+    SendAccountEmail.sendEmail(Trigger.new);
 }
 ```
 ### Classe Apex responsável pelo envio do email:
 
 ```
 public class SendAccountEmail {
-
-    public static void sendEmail(List<Account> accountsCreated){
-
-        EmailTemplate emailTemplate = [Select ID from EmailTemplate WHERE DeveloperName = 'SalesNewCustomerEmail'];
-
-        List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
-
+    
+   public static void sendEmail(List<Account> accountsCreated){
+        
+		List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+        
         for(Account acc : accountsCreated){
-
             if(acc.Wish_To_Send_Email_Confirmation__c == 'Yes' && acc.Email__c != null){
-
+                
                 Messaging.SingleEmailMessage singleMail = new Messaging.SingleEmailMessage();
                 String [] toAddress = new String[]{acc.Email__c};
-
+                                        
                 singleMail.setToAddresses(toAddress);
                 singleMail.setSubject('Welcome to Our Service!');
                 singleMail.setPlainTextBody('Dear Customer, thank you for signing up!');
                 singleMail.setSaveAsActivity(false);
-
+           
                 emails.add(singleMail);
-            }
-        }
-
+            }       
+        }   
+        
         if (!emails.isEmpty()) {
             Messaging.sendEmail(emails);
         }
@@ -268,7 +265,7 @@ export default class AccountEmailEditor extends LightningElement {
 
 
 ### 5. Processo Automático de Limpeza de Dados
-Criamos um processo que executa automaticamente uma vez por dia para deletar ordens com data de modificação maior que 3 meses, considerando o alto volume de dados envolvido.
+A fim de criar uma automação que seja capaz de realizar a deleção de ordens com data de modificação maior que 3 meses e, de modo a considerar o alto volume de dados envolvido, foi criado um código que define uma classe global chamada ScheduleMassDelete que implementa a interface Schedulable do Salesforce. Isso permite que a classe seja agendada para executar em intervalos específicos conforme definido pelo agendamento do Apex. Tal classe chama outra classe Apex inicia um trabalho de processamento em lote. Isso é adequado para operações que precisam processar um grande número de registros, como deletar ordens em massa.
 
 ### Classe Apex de Agendamento
 
@@ -276,7 +273,6 @@ Criamos um processo que executa automaticamente uma vez por dia para deletar ord
  global class ScheduleMassDelete implements Schedulable {
 
     global void execute(SchedulableContext sc){
-
         Database.executeBatch(new MassDeleteOrders(), 200);
     }
 }
