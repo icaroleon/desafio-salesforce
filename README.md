@@ -116,21 +116,36 @@ public class TestUpsertAccount {
 ```
 @RestResource(urlMapping='/InsertOrder/*')
 global class REST_InsertOrder {
-
+    
     @HttpPost
     global static void insertOrder(){
         RestRequest req = RestContext.request;
         RestResponse response = RestContext.response;
-
+        
         String reqBody = req.requestBody.toString();
         List<Order> ordersToInsert = (List<Order>) JSON.deserialize(reqBody, List<Order>.class);
-
+        
         try{
             insert ordersToInsert;
-
+            Map<String, Object> responseMap = new Map<String, Object>{
+                'status' => 'success',
+                    'message' => 'Orders have been inserted successfully.',
+                    'recordsInsertedSize' => ordersToInsert.size(),
+                    'recordsInserted' => ordersToInsert
+                    };
+                        
+                        String jsonResponse = JSON.serialize(responseMap);
+            response.responseBody = Blob.valueOf(jsonResponse);
             response.statusCode = 200;
-        } catch (Exception e){
-            RestContext.response.responseBody = Blob.valueOf('Error: ' + e.getMessage());
+        } catch (Exception e){           
+            Map<String, Object> errorResponse = new Map<String, Object>{
+                'status' => 'error',
+                'message' => 'Error: ' + e.getMessage()
+            };
+            
+            String errorJsonResponse = JSON.serialize(errorResponse);
+            response.responseBody = Blob.valueOf(errorJsonResponse);
+            response.statusCode = 500;
         }
     }
 }
@@ -261,7 +276,19 @@ export default class AccountEmailEditor extends LightningElement {
 }
 ```
 ## 4. Automação sem código
-- Uma automação sem uso de código foi implementada para atualizar o valor total de vendas de uma conta sempre que uma nova `Order` for associada a essa conta.
+Uma automação sem uso de código foi implementada para atualizar o valor total de vendas de uma conta sempre que uma nova `Order` for associada a essa conta. Para tanto, utilizou-se Flow Buider. Contudo, algumas considerações são necessárias.
+
+O requisito da tarefa é atualizar o campo Valor Total de Vendas sempre que uma nova Order for criada. No entanto, observa-se que, **no momento de criação de Order**, atualmente não há como associar o registro do objeto Order a um Produto específico. Além disso, mesmo que um campo fosse adicionado para permitir a associação de um produto ao criar uma Order, essa automação apresentaria limitações. A principal delas é que a atualização do Valor Total de Vendas ficaria limitada ao momento da criação da Order, sem considerar atualizações subsequentes, como a adição de novos itens, o que comprometeria a precisão do valor total.
+
+Outra limitação é que o campo "Order Amount" em Order é um campo de totalização e não ativa Flow Triggers, o que impede seu uso efetivo nesse contexto. Uma solução alternativa poderia ser a criação de um objeto Order personalizado, mas optou-se por não seguir esse caminho para poder aproveitar todas as funcionalidades padrão oferecidas pelo Salesforce.
+
+Para contornar essas dificuldades, implementou-se um Flow Trigger associado ao Objeto Order Product. Nesse cenário, sempre que um registro é criado ou atualizado, o sistema captura automaticamente a Order relacionada. Em seguida, obtém-se a Conta associada (informação disponível apenas após a captura da Order correspondente) e recolhe-se os demais itens da Order. Em seguida, realiza-se um loop em que todos os itens capturados são processados, atribuindo-se os seus valores ao valor total da Conta. Totalizando assim o Valor Total no Objeto Conta.
+
+<p align="center">
+  <img src="https://github.com/icaroleon/desafio-salesforce/assets/100085859/017a3db7-10f9-4816-9fb7-92eaac274ab0" />
+</p>
+
+
 
 
 ### 5. Processo Automático de Limpeza de Dados
